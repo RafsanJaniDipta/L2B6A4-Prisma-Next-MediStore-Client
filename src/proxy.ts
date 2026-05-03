@@ -9,15 +9,11 @@ export async function proxy(request: NextRequest) {
     const cookieHeader = request.headers.get("cookie") ?? ""
     const { data } = await userService.getSession(cookieHeader)
 
-    const isAuthenticated = !!data?.user
-    const isAdmin = data?.user?.role === ROLE.admin
-    const isSeller = data?.user?.role === ROLE.seller
+    // If session fetch failed or no user, let the request through —
+    // client-side useSession() handles unauthenticated state in the layout.
+    const isAdmin    = data?.user?.role === ROLE.admin
+    const isSeller   = data?.user?.role === ROLE.seller
     const isCustomer = data?.user?.role === ROLE.customer
-
-    // Not logged in → redirect to login
-    if (!isAuthenticated) {
-        return NextResponse.redirect(new URL("/login", request.url))
-    }
 
     // Admin trying to access non-admin pages → send to admin dashboard
     if (isAdmin && (pathname.startsWith("/dashboard") || pathname.startsWith("/seller-dashboard"))) {

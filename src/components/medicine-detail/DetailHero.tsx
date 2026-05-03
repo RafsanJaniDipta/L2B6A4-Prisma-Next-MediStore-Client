@@ -19,6 +19,7 @@ import { toast } from "sonner"
 import type { Medicine } from "@/types/medicine"
 import { authClient } from "@/lib/auth-client"
 import { useCartStore } from "@/store/cart.store"
+import { useMedicineImage } from "@/hooks/useMedicineImage"
 
 // ── Form → icon + gradient ────────────────────────────────
 const formIconMap: Record<string, React.ElementType> = {
@@ -34,12 +35,33 @@ const formGradientMap: Record<string, string> = {
   Spray: "from-sky-400/10 to-primary/5",
 }
 
-function MedicinePlaceholder({ form }: { form: string | null }) {
-  const Icon = form ? (formIconMap[form] ?? Package) : Package
-  const gradient = form ? (formGradientMap[form] ?? "from-primary/15 to-primary/5") : "from-muted to-muted/50"
+function MedicinePlaceholder({ form, slug, name }: { form: string | null; slug: string; name: string }) {
+  const wikiImage = useMedicineImage(name)
+  const Icon      = form ? (formIconMap[form] ?? Package) : Package
+  const gradient  = form ? (formGradientMap[form] ?? "from-primary/15 to-primary/5") : "from-muted to-muted/50"
+  const imgSrc    = wikiImage ?? `https://picsum.photos/seed/${slug}/600/600`
+
   return (
-    <div className={`flex size-full items-center justify-center bg-gradient-to-br ${gradient}`}>
-      <Icon className="size-24 text-primary/30" strokeWidth={1} />
+    <div className="relative size-full">
+      <img
+        src={imgSrc}
+        alt={name}
+        className="absolute inset-0 h-full w-full object-cover"
+        loading="lazy"
+        onError={(e) => {
+          const el = e.currentTarget as HTMLImageElement
+          if (wikiImage && !el.src.includes("picsum")) {
+            el.src = `https://picsum.photos/seed/${slug}/600/600`
+          } else {
+            el.style.display = "none"
+            const fallback = el.nextElementSibling as HTMLElement | null
+            if (fallback) fallback.style.display = "flex"
+          }
+        }}
+      />
+      <div className={`flex size-full items-center justify-center bg-gradient-to-br ${gradient}`} style={{ display: "none" }}>
+        <Icon className="size-24 text-primary/30" strokeWidth={1} />
+      </div>
     </div>
   )
 }
@@ -155,8 +177,8 @@ const DetailHero = ({ medicine, category }: DetailHeroProps) => {
       >
         <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <MedicinePlaceholder form={medicine.form} />
+            <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-primary/10">
+              <MedicinePlaceholder form={medicine.form} slug={medicine.slug} name={medicine.name} />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{medicine.name}</p>
@@ -206,7 +228,7 @@ const DetailHero = ({ medicine, category }: DetailHeroProps) => {
           {/* ── Left: Image + trust ──────────────────────── */}
           <div className="flex flex-col gap-3">
             <div className="relative aspect-square overflow-hidden rounded-2xl border bg-muted">
-              <MedicinePlaceholder form={medicine.form} />
+              <MedicinePlaceholder form={medicine.form} slug={medicine.slug} name={medicine.name} />
               <div className="absolute right-3 top-3 flex flex-col items-end gap-2">
                 {medicine.isFeatured && <Badge>Featured</Badge>}
                 {medicine.prescriptionRequired && (

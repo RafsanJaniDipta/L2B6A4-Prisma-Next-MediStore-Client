@@ -75,7 +75,20 @@ export interface AdminStats {
     totalSuspendedSellers: number
     salesBySeller: { sellerId: string; sellerName: string; totalOrders: number; totalRevenue: number }[]
   }
-  medicines: { totalMedicines: number; totalCategories: number }
+  medicines: {
+    totalMedicines: number
+    totalCategories: number
+    stockByCategory?: { category: string; totalStock: number }[]
+  }
+  orders?: {
+    byStatus?: {
+      PLACED?: number
+      PROCESSING?: number
+      SHIPPED?: number
+      DELIVERED?: number
+      CANCELLED?: number
+    }
+  }
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {

@@ -1,7 +1,8 @@
 "use client";
 
-import { Menu, Pill, LogOut, LayoutDashboard, User, ChevronDown, Package } from "lucide-react";
+import { Menu, Pill, LogOut, LayoutDashboard, User, ChevronDown, Package, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 import {
@@ -70,16 +71,21 @@ function getDashboardUrl(role?: string | null): string {
 
 // ── Menu items ────────────────────────────────────────────────────────────────
 const menuItems: MenuItem[] = [
-  { title: "Home",                url: "/" },
-  { title: "Categories",          url: "/categories" },
-  { title: "Medicines",           url: "/medicines" },
-  { title: "About",               url: "/about" },
+  { title: "Home",       url: "/home" },
+  { title: "Categories", url: "/categories" },
+  { title: "Medicines",  url: "/medicines" },
+  { title: "Blog",       url: "/blog" },
+  { title: "About",      url: "/about" },
+  { title: "Contact",    url: "/contact" },
 ]
 
 // ── User Avatar section ───────────────────────────────────────────────────────
 function UserMenu() {
   const router = useRouter()
   const { data: session, isPending } = authClient.useSession()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   const handleSignOut = async () => {
     await authClient.signOut()
@@ -87,7 +93,8 @@ function UserMenu() {
     router.refresh()
   }
 
-  if (isPending) {
+  // Always render skeleton until mounted — prevents hydration mismatch
+  if (!mounted || isPending) {
     return (
       <div className="size-9 animate-pulse rounded-full bg-muted" />
     )
@@ -268,6 +275,35 @@ function MobileUserSection() {
   )
 }
 
+// ── Navbar search bar ─────────────────────────────────────────────────────────
+function NavSearch() {
+  const router = useRouter()
+  const [query, setQuery] = useState("")
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (query.trim()) router.push(`/medicines?search=${encodeURIComponent(query.trim())}`)
+  }
+
+  return (
+    <form
+      onSubmit={handleSearch}
+      className="flex flex-1 max-w-sm items-center gap-2 rounded-lg border bg-muted/50 px-3 py-1.5 text-sm transition-colors focus-within:border-primary focus-within:bg-background"
+    >
+      <Search className="size-4 shrink-0 text-muted-foreground" />
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search medicines, brands…"
+        className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-muted-foreground text-sm"
+      />
+      <kbd className="hidden rounded border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground xl:block">
+        ⌘K
+      </kbd>
+    </form>
+  )
+}
+
 // ── Main Navbar ───────────────────────────────────────────────────────────────
 const Navbar = ({ className }: NavbarProps) => {
   return (
@@ -280,32 +316,36 @@ const Navbar = ({ className }: NavbarProps) => {
       <div className="container mx-auto w-full">
 
         {/* ── Desktop ──────────────────────────────────────────────────── */}
-        <nav className="hidden items-center justify-between py-3 lg:flex">
-          {/* Logo + nav links */}
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2">
-              <Pill className="size-8 text-primary" />
-              <span className="text-2xl font-bold tracking-tight">MediStore</span>
-            </Link>
+        <nav className="hidden items-center justify-between gap-6 py-3 lg:flex">
+          {/* Logo */}
+          <Link href="/" className="flex shrink-0 items-center gap-2">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Pill className="size-5" />
+            </div>
+            <span className="text-xl font-extrabold tracking-tight">MediStore</span>
+          </Link>
 
-            <NavigationMenu>
-              <NavigationMenuList>
-                {menuItems.map((item) => (
-                  <NavigationMenuItem key={item.title}>
-                    <NavigationMenuLink
-                      asChild
-                      className="inline-flex h-10 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-muted hover:text-accent-foreground"
-                    >
-                      <Link href={item.url}>{item.title}</Link>
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                ))}
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
+          {/* Nav links */}
+          <NavigationMenu className="shrink-0">
+            <NavigationMenuList>
+              {menuItems.map((item) => (
+                <NavigationMenuItem key={item.title}>
+                  <NavigationMenuLink
+                    asChild
+                    className="inline-flex h-9 w-max items-center justify-center rounded-md bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Link href={item.url}>{item.title}</Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              ))}
+            </NavigationMenuList>
+          </NavigationMenu>
+
+          {/* Search bar — flex-1 fills middle */}
+          <NavSearch />
 
           {/* Right side: theme toggle + cart + user */}
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
             <ModeToggle />
             <CartIcon />
             <UserMenu />

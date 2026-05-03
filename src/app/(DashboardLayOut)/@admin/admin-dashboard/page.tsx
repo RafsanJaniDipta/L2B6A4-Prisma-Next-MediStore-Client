@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
   Loader2, Users, ShoppingBag, Package, Tag, TrendingUp,
   Ban, CheckCircle2, Clock, UserX, Pencil, Trash2,
@@ -15,8 +16,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  LineChart, Line,
 } from "recharts"
 import { toast } from "sonner"
+import { TablePagination } from "@/components/ui/table-pagination"
 import {
   adminService,
   type AdminStats, type AdminUser, type AdminMedicine,
@@ -190,12 +193,15 @@ function OverviewTab({ stats }: { stats: AdminStats }) {
 const USER_STATUS_OPTIONS: UserStatus[] = ["ACTIVE","BANNED","PENDING","SUSPENDED"]
 const ROLE_FILTERS = ["ALL","ADMIN","SELLER","CUSTOMER"] as const
 
+const PAGE_SIZE = 10
+
 function UsersTab() {
   const [users, setUsers]     = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [roleFilter, setRoleFilter] = useState<"ALL"|"ADMIN"|"SELLER"|"CUSTOMER">("ALL")
   const [search, setSearch]   = useState("")
   const [updating, setUpdating] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     adminService.getUsers()
@@ -221,6 +227,9 @@ function UsersTab() {
     return matchRole && matchSearch
   })
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="size-7 animate-spin text-primary" /></div>
 
   return (
@@ -228,10 +237,10 @@ function UsersTab() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <Input placeholder="Search by name or email…" value={search}
-          onChange={(e) => setSearch(e.target.value)} className="h-8 max-w-xs text-sm" />
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="h-8 max-w-xs text-sm" />
         <div className="flex gap-1.5">
           {ROLE_FILTERS.map((r) => (
-            <button key={r} onClick={() => setRoleFilter(r)}
+            <button key={r} onClick={() => { setRoleFilter(r); setPage(1) }}
               className={`rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${
                 roleFilter === r ? "bg-primary text-primary-foreground border-primary"
                   : "bg-muted text-muted-foreground border-transparent"
@@ -254,7 +263,7 @@ function UsersTab() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((user) => (
+              {paginated.map((user) => (
                 <tr key={user.id}>
                   <td className="px-4 py-3">
                     <p className="font-medium">{user.name}</p>
@@ -290,6 +299,7 @@ function UsersTab() {
             <p className="py-12 text-center text-sm text-muted-foreground">No users found</p>
           )}
         </div>
+        <TablePagination page={page} totalPages={totalPages} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </div>
     </div>
   )
@@ -312,6 +322,7 @@ function OrdersTab() {
   const [buyerFilter, setBuyerFilter]   = useState<BuyerFilter>("ALL")
   const [expanded, setExpanded] = useState<string | null>(null)
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     adminService.getOrders()
@@ -338,6 +349,9 @@ function OrdersTab() {
     return matchStatus && matchBuyer
   })
 
+  const totalOrderPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginatedOrders = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="size-7 animate-spin text-primary" /></div>
 
   const sellerOrderCount   = orders.filter((o) => effectiveRole(o) === "SELLER").length
@@ -351,7 +365,7 @@ function OrdersTab() {
         {(["ALL", "CUSTOMER", "SELLER"] as const).map((b) => {
           const count = b === "ALL" ? orders.length : b === "SELLER" ? sellerOrderCount : customerOrderCount
           return (
-            <button key={b} onClick={() => setBuyerFilter(b)}
+            <button key={b} onClick={() => { setBuyerFilter(b); setPage(1) }}
               className={`rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${
                 buyerFilter === b
                   ? b === "SELLER"
@@ -375,7 +389,7 @@ function OrdersTab() {
                 return o.status === s && matchBuyer
               }).length
           return (
-            <button key={s} onClick={() => setStatusFilter(s as any)}
+            <button key={s} onClick={() => { setStatusFilter(s as any); setPage(1) }}
               className={`rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${
                 statusFilter === s ? "bg-primary text-primary-foreground border-primary"
                   : "bg-muted text-muted-foreground border-transparent"
@@ -397,7 +411,7 @@ function OrdersTab() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((order) => {
+              {paginatedOrders.map((order) => {
                 const isSeller = effectiveRole(order) === "SELLER"
                 const sellerCount = new Set(order.items.map((i) => i.medicine.seller.id)).size
                 return (
@@ -492,6 +506,7 @@ function OrdersTab() {
             <p className="py-12 text-center text-sm text-muted-foreground">No orders found</p>
           )}
         </div>
+        <TablePagination page={page} totalPages={totalOrderPages} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </div>
     </div>
   )
@@ -506,6 +521,7 @@ function MedicinesTab() {
   const [search, setSearch]       = useState("")
   const [filter, setFilter]       = useState<"ALL"|"ACTIVE"|"INACTIVE">("ALL")
   const [toggling, setToggling]   = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     adminService.getMedicines()
@@ -531,15 +547,18 @@ function MedicinesTab() {
     return matchFilter && matchSearch
   })
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="size-7 animate-spin text-primary" /></div>
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <Input placeholder="Search by name or seller…" value={search}
-          onChange={(e) => setSearch(e.target.value)} className="h-8 max-w-xs text-sm" />
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="h-8 max-w-xs text-sm" />
         {(["ALL","ACTIVE","INACTIVE"] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)}
+          <button key={f} onClick={() => { setFilter(f); setPage(1) }}
             className={`rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${
               filter === f ? "bg-primary text-primary-foreground border-primary"
                 : "bg-muted text-muted-foreground border-transparent"
@@ -561,7 +580,7 @@ function MedicinesTab() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((med) => (
+              {paginated.map((med) => (
                 <tr key={med.id} className={!med.isActive ? "opacity-60" : ""}>
                   <td className="px-4 py-3">
                     <p className="font-medium line-clamp-1">{med.name}</p>
@@ -599,6 +618,7 @@ function MedicinesTab() {
             <p className="py-12 text-center text-sm text-muted-foreground">No medicines found</p>
           )}
         </div>
+        <TablePagination page={page} totalPages={totalPages} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </div>
     </div>
   )
@@ -863,11 +883,193 @@ function ApprovalsTab() {
 }
 
 // ────────────────────────────────────────────────────────────
+// ANALYTICS TAB
+// ────────────────────────────────────────────────────────────
+function AnalyticsTab({ stats }: { stats: AdminStats }) {
+  const { sellers, medicines } = stats
+  const [orders, setOrders] = useState<AdminOrder[]>([])
+  useEffect(() => { adminService.getOrders().then(setOrders).catch(() => {}) }, [])
+
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  const now = new Date()
+
+  const revenueLineData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+    const monthOrders = orders.filter((o) => o.createdAt.startsWith(monthKey))
+    const revenue = monthOrders.reduce((sum, o) => sum + parseFloat(o.total || "0"), 0)
+    return {
+      month: monthNames[d.getMonth()],
+      revenue: Math.round(revenue),
+      orders: monthOrders.length,
+    }
+  })
+
+  const categoryBarData = medicines.stockByCategory?.map((c: any) => ({
+    name: c.category.length > 12 ? c.category.slice(0, 12) + "…" : c.category,
+    stock: c.totalStock,
+  })) ?? []
+
+  const topSellersBarData = sellers.salesBySeller
+    .slice(0, 7)
+    .map((s) => ({
+      name: s.sellerName.length > 12 ? s.sellerName.slice(0, 12) + "…" : s.sellerName,
+      revenue: s.totalRevenue,
+      orders: s.totalOrders,
+    }))
+
+  const orderStatusBarData = [
+    { status: "Placed",     value: orders.filter((o) => o.status === "PLACED").length,     fill: "#3b82f6" },
+    { status: "Processing", value: orders.filter((o) => o.status === "PROCESSING").length, fill: "#f59e0b" },
+    { status: "Shipped",    value: orders.filter((o) => o.status === "SHIPPED").length,    fill: "#8b5cf6" },
+    { status: "Delivered",  value: orders.filter((o) => o.status === "DELIVERED").length,  fill: "#10b981" },
+    { status: "Cancelled",  value: orders.filter((o) => o.status === "CANCELLED").length,  fill: "#ef4444" },
+  ].filter((d) => d.value > 0)
+
+  const userRolePie = [
+    { name: "Customers", value: stats.users.totalCustomers, fill: "#3b82f6" },
+    { name: "Sellers",   value: stats.sellers.totalSellers, fill: "#8b5cf6" },
+  ].filter((d) => d.value > 0)
+
+  const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }
+
+  return (
+    <div className="space-y-6">
+      {/* ── Row 1: Line charts ─────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Revenue trend */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="mb-1 text-sm font-semibold">Revenue Trend (Last 6 Months)</p>
+          <p className="mb-4 text-xs text-muted-foreground">Actual monthly revenue from completed orders</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={revenueLineData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`৳${v}`, "Revenue"]} />
+              <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Order volume trend */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="mb-1 text-sm font-semibold">Order Volume Trend (Last 6 Months)</p>
+          <p className="mb-4 text-xs text-muted-foreground">Actual monthly order counts</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={revenueLineData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [v, "Orders"]} />
+              <Line type="monotone" dataKey="orders" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Row 2: Bar charts ──────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Top Sellers by Revenue — Bar chart */}
+        {topSellersBarData.length > 0 && (
+          <div className="rounded-xl border bg-card p-5">
+            <p className="mb-1 text-sm font-semibold">Top Sellers by Revenue</p>
+            <p className="mb-4 text-xs text-muted-foreground">Revenue generated per seller</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={topSellersBarData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [name === "revenue" ? `৳${v}` : v, name === "revenue" ? "Revenue" : "Orders"]} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="orders"  name="Orders"  fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Orders by Status — Bar chart */}
+        {orderStatusBarData.length > 0 && (
+          <div className="rounded-xl border bg-card p-5">
+            <p className="mb-1 text-sm font-semibold">Orders by Status</p>
+            <p className="mb-4 text-xs text-muted-foreground">Breakdown of all orders by current status</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={orderStatusBarData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="status" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [v, "Orders"]} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {orderStatusBarData.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Stock by Category — Bar chart */}
+        {categoryBarData.length > 0 && (
+          <div className="rounded-xl border bg-card p-5">
+            <p className="mb-1 text-sm font-semibold">Stock by Category</p>
+            <p className="mb-4 text-xs text-muted-foreground">Total medicine stock per category</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={categoryBarData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="stock" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* User distribution — Pie chart */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="mb-1 text-sm font-semibold">User Distribution</p>
+          <p className="mb-4 text-xs text-muted-foreground">Customers vs Sellers ratio</p>
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie data={userRolePie} dataKey="value" nameKey="name"
+                cx="50%" cy="50%" outerRadius={90}
+                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                labelLine={false}>
+                {userRolePie.map((e, i) => <Cell key={i} fill={e.fill} />)}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────
 // ROOT PAGE
 // ────────────────────────────────────────────────────────────
+const VALID_TABS = ["overview","approvals","users","medicines","orders","sellers","categories","analytics"] as const
+type TabValue = typeof VALID_TABS[number]
+
 export default function AdminDashboardPage() {
   const [stats, setStats]     = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const rawTab = searchParams.get("tab") ?? "overview"
+  const activeTab: TabValue = (VALID_TABS as readonly string[]).includes(rawTab) ? rawTab as TabValue : "overview"
+
+  const handleTabChange = useCallback((tab: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (tab === "overview") params.delete("tab")
+    else params.set("tab", tab)
+    router.replace(`/admin-dashboard?${params.toString()}`, { scroll: false })
+  }, [searchParams, router])
 
   useEffect(() => {
     adminService.getStats()
@@ -891,22 +1093,7 @@ export default function AdminDashboardPage() {
         <p className="mt-1 text-sm text-muted-foreground">Platform overview — users, orders, medicines, and categories</p>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList className="mb-2 flex-wrap h-auto gap-1">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="approvals" className="gap-1.5">
-            Approvals
-            {(stats?.sellers.totalPendingSellers ?? 0) > 0 && (
-              <span className="flex size-4 items-center justify-center rounded-full bg-yellow-500 text-[10px] font-bold text-white">
-                {stats!.sellers.totalPendingSellers}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="medicines">Medicines</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
 
         <TabsContent value="overview">
           {stats && <OverviewTab stats={stats} />}
@@ -925,6 +1112,9 @@ export default function AdminDashboardPage() {
         </TabsContent>
         <TabsContent value="categories">
           <CategoriesTab />
+        </TabsContent>
+        <TabsContent value="analytics">
+          {stats && <AnalyticsTab stats={stats} />}
         </TabsContent>
       </Tabs>
     </div>

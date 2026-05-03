@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { medicineService } from "@/services/medicine.service"
 import type { Medicine } from "@/types/medicine"
+import { useMedicineImage } from "@/hooks/useMedicineImage"
 
 const formIconMap: Record<string, React.ElementType> = {
   Tablet: Pill, Capsule: Pill, Syrup: FlaskConical,
@@ -21,12 +22,33 @@ const formGradientMap: Record<string, string> = {
   Spray: "from-sky-400/10 to-primary/5",
 }
 
-function MiniPlaceholder({ form }: { form: string | null }) {
-  const Icon = form ? (formIconMap[form] ?? Package) : Package
-  const gradient = form ? (formGradientMap[form] ?? "from-primary/15 to-primary/5") : "from-muted to-muted/50"
+function MiniPlaceholder({ form, slug, name }: { form: string | null; slug: string; name: string }) {
+  const wikiImage = useMedicineImage(name)
+  const Icon      = form ? (formIconMap[form] ?? Package) : Package
+  const gradient  = form ? (formGradientMap[form] ?? "from-primary/15 to-primary/5") : "from-muted to-muted/50"
+  const imgSrc    = wikiImage ?? `https://picsum.photos/seed/${slug}/300/300`
+
   return (
-    <div className={`flex size-full items-center justify-center bg-gradient-to-br ${gradient}`}>
-      <Icon className="size-8 text-primary/30" strokeWidth={1.2} />
+    <div className="relative size-full">
+      <img
+        src={imgSrc}
+        alt={name}
+        className="absolute inset-0 h-full w-full object-cover"
+        loading="lazy"
+        onError={(e) => {
+          const el = e.currentTarget as HTMLImageElement
+          if (wikiImage && !el.src.includes("picsum")) {
+            el.src = `https://picsum.photos/seed/${slug}/300/300`
+          } else {
+            el.style.display = "none"
+            const fallback = el.nextElementSibling as HTMLElement | null
+            if (fallback) fallback.style.display = "flex"
+          }
+        }}
+      />
+      <div className={`flex size-full items-center justify-center bg-gradient-to-br ${gradient}`} style={{ display: "none" }}>
+        <Icon className="size-8 text-primary/30" strokeWidth={1.2} />
+      </div>
     </div>
   )
 }
@@ -66,7 +88,7 @@ const RelatedMedicines = ({ currentSlug, categoryId, categorySlug }: RelatedMedi
               className="group flex flex-col overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
             >
               <div className="relative aspect-square overflow-hidden">
-                <MiniPlaceholder form={med.form} />
+                <MiniPlaceholder form={med.form} slug={med.slug} name={med.name} />
                 {med.stock === 0 && (
                   <Badge variant="secondary" className="absolute right-2 top-2 text-xs">
                     Out of Stock

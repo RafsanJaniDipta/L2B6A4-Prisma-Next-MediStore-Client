@@ -13,6 +13,13 @@ import { cn } from "@/lib/utils"
 import { authClient } from "@/lib/auth-client"
 import { ROLE } from "@/constants/role"
 
+function roleToUrl(role?: string): string {
+  const r = role?.toUpperCase()
+  if (r === ROLE.admin)  return "/admin-dashboard"
+  if (r === ROLE.seller) return "/seller-dashboard"
+  return "/home"
+}
+
 export function LoginForm({ className, ...props }: React.ComponentProps<"form">) {
   const router = useRouter()
   const [email, setEmail] = useState("")
@@ -25,8 +32,32 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
   const handleGoogleLogIn = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: `${process.env.NEXT_PUBLIC_FRONTEND_URL}/home`,
+      callbackURL: `${process.env.NEXT_PUBLIC_FRONTEND_URL}/auth-redirect`,
     })
+  }
+
+  // Demo login — sign out first, sign in fresh, then redirect by role
+  const handleDemoLogin = async (demoEmail: string, demoPassword: string, label: string) => {
+    setIsLoading(true)
+    setNeedsVerification(false)
+    toast.loading(`Signing in as ${label}…`, { id: "demo-login" })
+
+    await authClient.signOut()
+
+    const { error } = await authClient.signIn.email({ email: demoEmail, password: demoPassword })
+    toast.dismiss("demo-login")
+    setIsLoading(false)
+
+    if (error) {
+      toast.error(error.message ?? "Demo login failed.")
+      return
+    }
+
+    // Read the fresh session to get the role, then go directly to the right dashboard
+    const { data: session } = await authClient.getSession()
+    const role = (session?.user as any)?.role
+    toast.success(`Signed in as ${label}!`)
+    router.push(roleToUrl(role))
   }
 
   const handleResendVerification = async () => {
@@ -50,7 +81,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
     setIsLoading(true)
     setNeedsVerification(false)
 
-    const { data, error } = await authClient.signIn.email({
+    const { error } = await authClient.signIn.email({
       email,
       password,
     })
@@ -68,29 +99,23 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
       return
     }
 
-    const user = data?.user as { role?: string; status?: string } | null
-    const role = user?.role?.toUpperCase()
-    const status = user?.status?.toUpperCase()
+    const { data: session } = await authClient.getSession()
+    const role = (session?.user as any)?.role
+    const status = (session?.user as any)?.status?.toUpperCase()
 
     if (status === "PENDING") {
       await authClient.signOut()
-      toast.error("Your seller account is pending admin approval. You'll be notified once approved.")
+      toast.error("Your seller account is pending admin approval.")
       return
     }
-
     if (status === "BANNED" || status === "SUSPENDED") {
       await authClient.signOut()
-      toast.error("Your account has been suspended. Please contact support.")
+      toast.error("Your account has been suspended. Contact support.")
       return
     }
 
     toast.success("Welcome back!")
-
-    if (role === ROLE.admin) router.push("/admin-dashboard")
-    else if (role === ROLE.seller) router.push("/seller-dashboard")
-    else router.push("/home")
-
-    router.refresh()
+    router.push(roleToUrl(role))
   }
 
   return (
@@ -104,6 +129,33 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
         <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
         <p className="text-sm text-muted-foreground">
           Sign in to your MediStore account to continue
+        </p>
+      </div>
+
+      {/* ── Quick Demo Login ─────────────────────────────────── */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+        <p className="mb-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Quick Demo Login
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Admin",    email: "admin@medistore.com",    password: "admin1234",    color: "border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20" },
+            { label: "Seller",   email: "seller@medistore.com",   password: "seller1234",   color: "border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20" },
+            { label: "Customer", email: "customer@medistore.com", password: "customer1234", color: "border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20" },
+          ].map(({ label, email: demoEmail, password: demoPass, color }) => (
+            <button
+              key={label}
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleDemoLogin(demoEmail, demoPass, label)}
+              className={`rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${color}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] text-muted-foreground">
+          One click to instantly sign in as any role.
         </p>
       </div>
 

@@ -28,6 +28,7 @@ import { useState } from "react"
 import type { Medicine } from "@/types/medicine"
 import { useCartStore } from "@/store/cart.store"
 import { authClient } from "@/lib/auth-client"
+import { useMedicineImage } from "@/hooks/useMedicineImage"
 
 const BULK_PRESETS = [100, 500, 1000]
 
@@ -51,17 +52,42 @@ const formGradientMap: Record<string, string> = {
   Spray: "from-sky-400/10 to-primary/5",
 }
 
-function MedicinePlaceholder({ form }: { form: string | null }) {
+function MedicinePlaceholder({ form, slug, name }: { form: string | null; slug: string; name: string }) {
+  const wikiImage = useMedicineImage(name)
   const Icon = form ? (formIconMap[form] ?? Package) : Package
   const gradient = form
     ? (formGradientMap[form] ?? "from-primary/15 to-primary/5")
     : "from-muted to-muted/50"
 
+  // Priority: 1) Wikipedia real medicine image  2) picsum fallback  3) icon gradient
+  const imgSrc = wikiImage ?? `https://picsum.photos/seed/${slug}/400/300`
+
   return (
-    <div
-      className={`flex size-full items-center justify-center bg-gradient-to-br ${gradient}`}
-    >
-      <Icon className="size-14 text-primary/40" strokeWidth={1.2} />
+    <div className="relative size-full">
+      <img
+        src={imgSrc}
+        alt={name}
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        loading="lazy"
+        onError={(e) => {
+          const el = e.currentTarget as HTMLImageElement
+          // If wiki image failed, try picsum
+          if (wikiImage && !el.src.includes("picsum")) {
+            el.src = `https://picsum.photos/seed/${slug}/400/300`
+          } else {
+            el.style.display = "none"
+            const fallback = el.nextElementSibling as HTMLElement | null
+            if (fallback) fallback.style.display = "flex"
+          }
+        }}
+      />
+      {/* Icon gradient shown only when all images fail */}
+      <div
+        className={`flex size-full items-center justify-center bg-gradient-to-br ${gradient}`}
+        style={{ display: "none" }}
+      >
+        <Icon className="size-14 text-primary/40" strokeWidth={1.2} />
+      </div>
     </div>
   )
 }
@@ -119,14 +145,14 @@ const ProductCard = ({ medicine, featured }: ProductCardProps) => {
     <TooltipProvider>
       <Link
         href={`/medicines/${medicine.slug}`}
-        className={`group flex flex-col overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5 ${featured
+        className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5 ${featured
           ? "border-primary/30 ring-1 ring-primary/20"
           : "hover:border-primary/30"
           }`}
       >
         {/* ── Image ─────────────────────────────────────── */}
         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-          <MedicinePlaceholder form={medicine.form} />
+          <MedicinePlaceholder form={medicine.form} slug={medicine.slug} name={medicine.name} />
 
           {/* Wishlist button — top-left */}
           <button

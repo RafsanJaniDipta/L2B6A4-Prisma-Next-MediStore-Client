@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { Loader2 } from "lucide-react"
 import { medicineService } from "@/services/medicine.service"
 import type { Medicine } from "@/types/medicine"
 import MedicinesHero from "@/components/medicines/MedicinesHero"
@@ -14,6 +13,7 @@ import ProductSort, { type SortOption } from "@/components/products/ProductSort"
 import ProductCard from "@/components/products/ProductCard"
 import ProductEmpty from "@/components/products/ProductEmpty"
 import ProductPagination from "@/components/products/ProductPagination"
+import { ProductCardSkeletonGrid } from "@/components/products/ProductCardSkeleton"
 
 const ITEMS_PER_PAGE = 12
 
@@ -218,11 +218,9 @@ export default function MedicinesPage() {
 
             {/* Loading state */}
             {isLoading ? (
-              <div className="flex min-h-[40vh] items-center justify-center">
-                <Loader2 className="size-8 animate-spin text-primary" />
-              </div>
+              <ProductCardSkeletonGrid count={12} />
             ) : paginated.length > 0 ? (
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-4">
                 {paginated.map((medicine) => (
                   <ProductCard key={medicine.id} medicine={medicine} />
                 ))}

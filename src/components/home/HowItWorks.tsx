@@ -1,94 +1,47 @@
-import React from "react";
-import { Search, ShoppingCart, ClipboardList, PackageCheck, MoveRight } from "lucide-react";
-
 const steps = [
-  {
-    id: 1,
-    icon: <Search className="size-8" />,
-    title: "Browse Medicines",
-    description: "Search and explore our wide range of OTC medicines by category, price, or manufacturer.",
-  },
-  {
-    id: 2,
-    icon: <ShoppingCart className="size-8" />,
-    title: "Add to Cart",
-    description: "Select your medicines, choose the quantity, and add them to your cart.",
-  },
-  {
-    id: 3,
-    icon: <ClipboardList className="size-8" />,
-    title: "Place Your Order",
-    description: "Enter your shipping address and confirm your order with Cash on Delivery.",
-  },
-  {
-    id: 4,
-    icon: <PackageCheck className="size-8" />,
-    title: "Get Delivered",
-    description: "Track your order in real-time and receive your medicines at your doorstep.",
-  },
+  { n: "01", title: "Search & Select",       desc: "Find medicines by name, brand, or condition. Filter by prescription status, form, or price." },
+  { n: "02", title: "Upload Prescription",   desc: "Snap or upload your prescription — our pharmacists verify it in under 5 minutes." },
+  { n: "03", title: "Pay Your Way",          desc: "Cash on delivery, card, or mobile banking. No advance payment required." },
+  { n: "04", title: "Track to Your Door",    desc: "Real-time tracking from dispatch through doorstep, with live ETA updates." },
 ];
 
+/**
+ * HowItWorks
+ * ───────────
+ * .section-head → heading scroll-reveal
+ * .step         → individual card scroll-reveal
+ */
 const HowItWorks = () => {
   return (
     <section className="container mx-auto px-4 py-16">
-      <h2 className="mb-4 text-center text-5xl font-bold">How It Works</h2>
-      <p className="mx-auto mb-12 max-w-2xl text-center text-2xl text-muted-foreground">
-        Getting your medicines delivered is simple and hassle-free.
-      </p>
-
-      {/* Mobile / tablet: stacked grid */}
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:hidden">
-        {steps.map((step) => (
-          <div key={step.id} className="flex flex-col items-center text-center">
-            <div className="mb-4 flex size-28 flex-col items-center justify-center rounded-full bg-primary/10 transition-colors hover:bg-primary/20">
-              <span className="mb-1 text-xs font-bold text-primary">
-                STEP {step.id}
-              </span>
-              <div className="text-primary">{step.icon}</div>
-            </div>
-            <h3 className="mb-2 text-xl font-semibold">{step.title}</h3>
-            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-              {step.description}
-            </p>
-          </div>
-        ))}
+      {/* .section-head */}
+      <div className="section-head mb-12 max-w-2xl mx-auto text-center">
+        <span className="mb-3 inline-block rounded-full bg-primary/10 px-4 py-1 text-sm font-semibold text-primary">
+          How It Works
+        </span>
+        <h2 className="mt-3 text-balance text-4xl font-bold tracking-tight">
+          Four steps from search to doorstep.
+        </h2>
       </div>
 
-      {/* Desktop: flex row, arrows stretch to fill */}
-      <div className="hidden items-start lg:flex">
-        {steps.map((step, index) => (
-          <React.Fragment key={step.id}>
-            {/* Step Card */}
-            <div className="flex w-56 shrink-0 flex-col items-center text-center">
-              <div className="mb-4 flex size-28 flex-col items-center justify-center rounded-full bg-primary/10 transition-colors hover:bg-primary/20">
-                <span className="mb-1 text-xs font-bold text-primary">
-                  STEP {step.id}
-                </span>
-                <div className="text-primary">{step.icon}</div>
-              </div>
-              <h3 className="mb-2 text-xl font-semibold">{step.title}</h3>
-              <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-                {step.description}
-              </p>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {steps.map((step, i) => (
+          /* .step — GSAP scroll-reveal target */
+          <div
+            key={step.n}
+            className="step relative rounded-2xl border bg-card p-6 transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-md"
+          >
+            <div className="mb-4 inline-flex items-center justify-center rounded-full bg-primary px-3 py-1 text-sm font-bold text-primary-foreground">
+              {step.n}
             </div>
+            <h3 className="mb-2 text-base font-bold text-foreground">{step.title}</h3>
+            <p className="text-sm leading-relaxed text-muted-foreground">{step.desc}</p>
 
-            {/* Arrow between steps — flex-1 makes it stretch to fill */}
-            {index < steps.length - 1 && (
-              <div className="flex flex-1 items-center justify-center pt-14">
-                <div className="relative h-10 w-full">
-                  {/* Track line */}
-                  <div className="absolute top-1/2 left-0 h-0.5 w-full -translate-y-1/2 rounded-full bg-primary/10" />
-                  {/* Sliding arrow */}
-                  <div className="animate-arrow-slide absolute inset-0 flex items-center justify-center">
-                    <MoveRight
-                      className="h-10 w-20 text-primary"
-                      strokeWidth={2}
-                    />
-                  </div>
-                </div>
-              </div>
+            {/* Connector line */}
+            {i < steps.length - 1 && (
+              <div className="absolute -right-2.5 top-9 hidden h-px w-5 bg-border lg:block" />
             )}
-          </React.Fragment>
+          </div>
         ))}
       </div>
     </section>

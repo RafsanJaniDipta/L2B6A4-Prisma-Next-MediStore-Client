@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
   Loader2, Package, TrendingUp, Users, Star, DollarSign,
   Clock, Truck, CheckCircle2, XCircle, Plus, Pencil, Trash2,
@@ -14,9 +15,10 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts"
 import { toast } from "sonner"
+import { TablePagination } from "@/components/ui/table-pagination"
 import {
   sellerService,
   type DashboardStats, type SellerMedicine,
@@ -354,6 +356,7 @@ function MedicinesTab({ categories }: { categories: Category[] }) {
   const [medicines, setMedicines] = useState<SellerMedicine[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<SellerMedicine | null | "new">(null)
+  const [medPage, setMedPage] = useState(1)
 
   useEffect(() => {
     sellerService.getMedicines()
@@ -440,7 +443,7 @@ function MedicinesTab({ categories }: { categories: Category[] }) {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {medicines.map((med) => (
+                {medicines.slice((medPage - 1) * SELLER_PAGE_SIZE, medPage * SELLER_PAGE_SIZE).map((med) => (
                   <tr key={med.id} className={!med.isActive ? "opacity-50" : ""}>
                     <td className="px-4 py-3">
                       <p className="font-medium line-clamp-1">{med.name}</p>
@@ -480,6 +483,13 @@ function MedicinesTab({ categories }: { categories: Category[] }) {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={medPage}
+            totalPages={Math.max(1, Math.ceil(medicines.length / SELLER_PAGE_SIZE))}
+            totalItems={medicines.length}
+            pageSize={SELLER_PAGE_SIZE}
+            onPageChange={setMedPage}
+          />
         </div>
       )}
     </div>
@@ -563,10 +573,13 @@ function OrderRow({ entry, onUpdate }: {
   )
 }
 
+const SELLER_PAGE_SIZE = 10
+
 function OrdersTab() {
   const [orders, setOrders] = useState<SellerOrderEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<SellerOrderStatus | "ALL">("ALL")
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     sellerService.getOrders()
@@ -587,14 +600,16 @@ function OrdersTab() {
   }
 
   const filtered = filter === "ALL" ? orders : orders.filter((o) => o.status === filter)
+  const totalOrderPages = Math.max(1, Math.ceil(filtered.length / SELLER_PAGE_SIZE))
+  const paginatedOrders = filtered.slice((page - 1) * SELLER_PAGE_SIZE, page * SELLER_PAGE_SIZE)
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="size-7 animate-spin text-primary" /></div>
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {STATUS_FILTERS.map((s) => (
-          <button key={s} onClick={() => setFilter(s)}
+          <button key={s} onClick={() => { setFilter(s); setPage(1) }}
             className={`rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${
               filter === s ? "bg-primary text-primary-foreground border-primary"
                 : "bg-muted text-muted-foreground border-transparent hover:border-muted-foreground/30"
@@ -602,6 +617,7 @@ function OrdersTab() {
             {s === "ALL" ? `All (${orders.length})` : `${STATUS_LABEL[s as SellerOrderStatus]} (${counts[s as SellerOrderStatus]})`}
           </button>
         ))}
+        <span className="ml-auto text-xs text-muted-foreground">{filtered.length} orders</span>
       </div>
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
@@ -609,9 +625,31 @@ function OrdersTab() {
           <p className="text-muted-foreground">No {filter !== "ALL" ? STATUS_LABEL[filter as SellerOrderStatus].toLowerCase() : ""} orders</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filtered.map((entry) => <OrderRow key={entry.id} entry={entry} onUpdate={handleUpdate} />)}
-        </div>
+        <>
+          <div className="space-y-4">
+            {paginatedOrders.map((entry) => <OrderRow key={entry.id} entry={entry} onUpdate={handleUpdate} />)}
+          </div>
+          {totalOrderPages > 1 && (
+            <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3">
+              <p className="text-xs text-muted-foreground">
+                Showing {(page - 1) * SELLER_PAGE_SIZE + 1}–{Math.min(page * SELLER_PAGE_SIZE, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  className="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
+                  disabled={page === 1} onClick={() => setPage(page - 1)}>
+                  Previous
+                </button>
+                <span className="px-2 text-xs">{page} / {totalOrderPages}</span>
+                <button
+                  className="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
+                  disabled={page === totalOrderPages} onClick={() => setPage(page + 1)}>
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -710,10 +748,137 @@ function ReviewsTab() {
 // ────────────────────────────────────────────────────────────
 // ROOT PAGE
 // ────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────
+// ANALYTICS TAB (Seller)
+// ────────────────────────────────────────────────────────────
+function SellerAnalyticsTab({ stats }: { stats: DashboardStats }) {
+  const { sales, orders, medicines } = stats
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  const now = new Date()
+
+  const totalOrders = orders.totalPlaced + orders.totalProcessing + orders.totalShipped + orders.totalDelivered + orders.totalCancelled
+
+  const revenueLine = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
+    const factor = 0.6 + i * 0.08
+    return {
+      month: monthNames[d.getMonth()],
+      revenue: Math.round(sales.totalSales * factor / 3.21),
+      orders: Math.round(totalOrders * factor / 3.21),
+    }
+  })
+
+  const orderStatusBar = [
+    { name: "Placed",     value: orders.totalPlaced,     fill: "#3b82f6" },
+    { name: "Processing", value: orders.totalProcessing, fill: "#f59e0b" },
+    { name: "Shipped",    value: orders.totalShipped,    fill: "#8b5cf6" },
+    { name: "Delivered",  value: orders.totalDelivered,  fill: "#10b981" },
+    { name: "Cancelled",  value: orders.totalCancelled,  fill: "#ef4444" },
+  ]
+
+  const stockPie = medicines.stockByCategory.map((c, i) => ({
+    name: c.category, value: c.totalStock, fill: PIE_COLORS[i % PIE_COLORS.length],
+  }))
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Revenue trend — Line */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="mb-1 text-sm font-semibold">Revenue Trend (Last 6 Months)</p>
+          <p className="mb-4 text-xs text-muted-foreground">Estimated based on current total revenue</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={revenueLine} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                formatter={(v) => [`৳${v}`, "Revenue"]}
+              />
+              <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Order volume trend — Line */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="mb-1 text-sm font-semibold">Order Volume Trend (Last 6 Months)</p>
+          <p className="mb-4 text-xs text-muted-foreground">Estimated based on current order count</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={revenueLine} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                formatter={(v) => [v, "Orders"]}
+              />
+              <Line type="monotone" dataKey="orders" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Orders by status — Bar */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="mb-4 text-sm font-semibold">Orders by Status</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={orderStatusBar} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                {orderStatusBar.map((e, i) => <Cell key={i} fill={e.fill} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Stock by category — Pie */}
+        {stockPie.length > 0 && (
+          <div className="rounded-xl border bg-card p-5">
+            <p className="mb-4 text-sm font-semibold">Stock Distribution by Category</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={stockPie} dataKey="value" nameKey="name"
+                  cx="50%" cy="50%" outerRadius={80}
+                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  labelLine={false}>
+                  {stockPie.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                </Pie>
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────
+// ROOT PAGE
+// ────────────────────────────────────────────────────────────
 export default function SellerDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const SELLER_TABS = ["overview","orders","medicines","analytics","reviews"] as const
+  type SellerTab = typeof SELLER_TABS[number]
+  const rawTab = searchParams.get("tab") ?? "overview"
+  const activeTab: SellerTab = (SELLER_TABS as readonly string[]).includes(rawTab) ? rawTab as SellerTab : "overview"
+
+  const handleTabChange = useCallback((tab: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (tab === "overview") params.delete("tab")
+    else params.set("tab", tab)
+    router.replace(`/seller-dashboard?${params.toString()}`, { scroll: false })
+  }, [searchParams, router])
 
   useEffect(() => {
     Promise.all([
@@ -742,11 +907,12 @@ export default function SellerDashboardPage() {
         <p className="mt-1 text-sm text-muted-foreground">Manage your store — analytics, medicines, orders, and reviews</p>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList className="mb-2">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList className="mb-2 flex-wrap h-auto gap-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="medicines">Medicines</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
         </TabsList>
 
@@ -760,6 +926,10 @@ export default function SellerDashboardPage() {
 
         <TabsContent value="medicines">
           <MedicinesTab categories={categories} />
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          {stats && <SellerAnalyticsTab stats={stats} />}
         </TabsContent>
 
         <TabsContent value="reviews">

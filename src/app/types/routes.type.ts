@@ -1,3 +1,5 @@
+import type React from "react"
+
 /**
  * Shared types for dashboard route configuration.
  *
@@ -22,6 +24,7 @@ export type RoleName = "Admin" | "Seller" | "Customer"
 export type RouteItem = {
   title: string
   url: string
+  icon?: React.ComponentType<{ className?: string }>
   items?: RouteItem[]
 }
 

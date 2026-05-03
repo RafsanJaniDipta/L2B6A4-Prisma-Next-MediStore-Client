@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { Pill } from "lucide-react"
 
 import {
@@ -34,14 +34,21 @@ export function AppSidebar({
   customer: { role: string }
 } & React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   const roleLower = admin.role?.toLowerCase()
   let routes: RouteGroup[] = []
-  if (roleLower === "admin")    routes = adminRoutes
+  if (roleLower === "admin")         routes = adminRoutes
   else if (roleLower === "seller")   routes = sellerRoutes
   else if (roleLower === "customer") routes = customerRoutes
 
-  const isActive = (url: string) => pathname === url
+  const isActive = (url: string) => {
+    const [urlPath, urlQuery] = url.split("?")
+    if (pathname !== urlPath) return false
+    if (!urlQuery) return !searchParams.get("tab") // base URL = no tab param
+    const urlParams = new URLSearchParams(urlQuery)
+    return searchParams.get("tab") === urlParams.get("tab")
+  }
 
   return (
     <Sidebar {...props}>
@@ -72,7 +79,10 @@ export function AppSidebar({
                           isActive={isActive(item.url)}
                           className="font-medium"
                         >
-                          <Link href={item.url}>{item.title}</Link>
+                          <Link href={item.url}>
+                            {item.icon && <item.icon className="size-4" />}
+                            {item.title}
+                          </Link>
                         </SidebarMenuButton>
                         <SidebarMenuSub>
                           {item.items!.map((child) => (
@@ -96,7 +106,10 @@ export function AppSidebar({
                         asChild
                         isActive={isActive(item.url)}
                       >
-                        <Link href={item.url}>{item.title}</Link>
+                        <Link href={item.url}>
+                          {item.icon && <item.icon className="size-4" />}
+                          {item.title}
+                        </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   )
